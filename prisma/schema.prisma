@@ -1,0 +1,306 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  CREATOR
+  ADMIN
+}
+
+enum CircleType {
+  UY
+  ONLINE
+  KURS
+}
+
+enum PriceType {
+  FIXED
+  NEGOTIABLE
+  FREE
+}
+
+enum Currency {
+  UZS
+  USD
+}
+
+enum PricePeriod {
+  MONTHLY
+  WEEKLY
+  ONE_TIME
+  PER_LESSON
+}
+
+enum CircleStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+  REJECTED
+  ARCHIVED
+}
+
+enum GroupStatus {
+  ACTIVE
+  FULL
+  INACTIVE
+}
+
+enum PaymentProvider {
+  CLICK
+  PAYME
+  UZUM
+  ALIF
+  PAYNET
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+enum PaidFeatureType {
+  VIDEO_TOUR
+  ANALYTICS
+  PROMO
+}
+
+enum NotificationType {
+  CIRCLE_APPROVED
+  CIRCLE_REJECTED
+  CERTIFICATE_VERIFIED
+  RESULT_VERIFIED
+  GROUP_ADDED
+  SYSTEM
+  EMAIL_VERIFY
+}
+
+model User {
+  id         String   @id @default(uuid())
+  firstName  String
+  lastName   String
+  age        Int?
+  email      String   @unique
+  password   String?
+  googleId   String?  @unique
+  avatarUrl  String?
+  role       Role     @default(USER)
+  isVerified Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  circles       Circle[]                  @relation("UserCircles")
+  courseCenters CourseCenter[]            @relation("UserCourseCenters")
+  payments      Payment[]
+  refreshTokens RefreshToken[]
+  emailTokens   EmailVerificationToken[]
+  notifications Notification[]
+  circleViews   CircleView[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("email_verification_tokens")
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  message   String
+  link      String?
+  isRead    Boolean          @default(false)
+  meta      Json?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model CourseCenter {
+  id              String    @id @default(uuid())
+  name            String
+  description     String?   @db.Text
+  address         String?
+  latitude        Float?
+  longitude       Float?
+  contactPhone    String?
+  contactTelegram String?
+  images          String[]
+  tourVideoUrl    String?
+  deletedAt       DateTime?
+  ownerId         String
+  owner           User      @relation("UserCourseCenters", fields: [ownerId], references: [id], onDelete: Cascade)
+  circles         Circle[]  @relation("CourseCenterCircles")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([ownerId])
+  @@index([deletedAt])
+  @@map("course_centers")
+}
+
+model Circle {
+  id              String       @id @default(uuid())
+  name            String
+  category        String
+  direction       String
+  type            CircleType
+  description     String       @db.Text
+  tavsif          String       @db.Text
+  images          String[]
+  videoUrl        String?
+  priceType       PriceType
+  priceAmount     Float?
+  currency        Currency?
+  pricePeriod     PricePeriod?
+  address         String?
+  latitude        Float?
+  longitude       Float?
+  ageGroupMin     Int?
+  ageGroupMax     Int?
+  contactPhone    String?
+  contactTelegram String?
+  status          CircleStatus @default(PENDING)
+  viewCount       Int          @default(0)
+  clickCount      Int          @default(0)
+  deletedAt       DateTime?
+  ownerId         String
+  owner           User         @relation("UserCircles", fields: [ownerId], references: [id], onDelete: Cascade)
+  courseCenterId  String?
+  courseCenter    CourseCenter? @relation("CourseCenterCircles", fields: [courseCenterId], references: [id], onDelete: Cascade)
+  groups          Group[]
+  results         Result[]
+  views           CircleView[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([direction])
+  @@index([category])
+  @@index([type])
+  @@index([status])
+  @@index([ownerId])
+  @@index([priceAmount])
+  @@index([createdAt])
+  @@index([viewCount])
+  @@index([deletedAt])
+  @@index([latitude, longitude])
+  @@index([name])
+  @@map("circles")
+}
+
+model CircleView {
+  id        String   @id @default(uuid())
+  circleId  String
+  circle    Circle   @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  ipHash    String?
+  createdAt DateTime @default(now())
+
+  @@index([circleId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("circle_views")
+}
+
+model Group {
+  id            String      @id @default(uuid())
+  name          String?
+  teacherName   String?
+  teacherBio    String?
+  teacherAvatar String?
+  schedule      Json?
+  maxStudents   Int?
+  takenStudents Int         @default(0)
+  status        GroupStatus @default(ACTIVE)
+  circleId      String
+  circle        Circle      @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  certificates  Certificate[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([circleId])
+  @@map("groups")
+}
+
+model Certificate {
+  id        String   @id @default(uuid())
+  groupId   String
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  title     String
+  imageUrl  String
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([groupId])
+  @@index([verified])
+  @@map("certificates")
+}
+
+model Result {
+  id          String   @id @default(uuid())
+  circleId    String
+  circle      Circle   @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  title       String
+  type        String
+  imageUrl    String
+  studentName String?
+  verified    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([circleId])
+  @@index([verified])
+  @@map("results")
+}
+
+model Payment {
+  id                    String          @id @default(uuid())
+  userId                String
+  user                  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  featureType           PaidFeatureType
+  provider              PaymentProvider
+  amount                Float
+  currency              Currency        @default(UZS)
+  status                PaymentStatus   @default(PENDING)
+  providerTransactionId String?
+  targetCircleId        String?
+  targetCourseCenterId  String?
+  metadata              Json?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("payments")
+}
