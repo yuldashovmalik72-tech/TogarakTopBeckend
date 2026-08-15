@@ -224,8 +224,20 @@ const createCircle = asyncHandler(async (req, res) => {
     throw ApiError.badRequest("UY yoki ONLINE turida courseCenterId yuborilmasligi kerak");
   }
 
-  const images = (req.files || []).map((f) => `/uploads/images/${f.filename}`);
-  if (images.length > 2) throw ApiError.badRequest("Maksimum 2 ta rasm yuklash mumkin");
+  // Fayl yuklash (local) yoki to'liq rasm URL (Cloudinary, ImgBB va h.k.)
+  const fileImages = (req.files || []).map((f) => `/uploads/images/${f.filename}`);
+  let urlImages = [];
+  if (req.body.imageUrls) {
+    let raw = req.body.imageUrls;
+    if (typeof raw === "string") {
+      try { raw = JSON.parse(raw); } catch { raw = raw.split(",").map((s) => s.trim()); }
+    }
+    urlImages = (Array.isArray(raw) ? raw : [raw])
+      .filter((u) => typeof u === "string" && /^https?:\/\//i.test(u.trim()))
+      .map((u) => u.trim());
+  }
+  const images = [...fileImages, ...urlImages].slice(0, 2);
+  if (images.length > 2) throw ApiError.badRequest("Maksimum 2 ta rasm bo'lishi mumkin");
 
   const circle = await prisma.circle.create({
     data: {
@@ -272,19 +284,41 @@ const updateCircle = asyncHandler(async (req, res) => {
   if (data.ageGroupMin !== undefined) data.ageGroupMin = data.ageGroupMin ? Number(data.ageGroupMin) : null;
   if (data.ageGroupMax !== undefined) data.ageGroupMax = data.ageGroupMax ? Number(data.ageGroupMax) : null;
 
-  let images = [...(circle.images || [])];
-  let removeList = req.body.removeImages;
-  if (typeof removeList === "string") {
-    try { removeList = JSON.parse(removeList); } catch { removeList = [removeList]; }
-  }
-  if (Array.isArray(removeList) && removeList.length) {
-    images = images.filter((url) => !removeList.includes(url));
-  }
-  const newFiles = (req.files || []).map((f) => `/uploads/images/${f.filename}`);
-  images = [...images, ...newFiles];
-  if (images.length > 2) throw ApiError.badRequest("Maksimum 2 ta rasm bo'lishi mumkin");
-  if (newFiles.length || (Array.isArray(removeList) && removeList.length)) {
-    data.images = images;
+  // To'liq images massivi yuborilsa — almashtiriladi (URL lar uchun)
+  if (req.body.images !== undefined) {
+    let raw = req.body.images;
+    if (typeof raw === "string") {
+      try { raw = JSON.parse(raw); } catch { raw = raw ? [raw] : []; }
+    }
+    data.images = (Array.isArray(raw) ? raw : [])
+      .filter((u) => typeof u === "string" && u.trim())
+      .map((u) => u.trim())
+      .slice(0, 2);
+  } else {
+    let images = [...(circle.images || [])];
+    let removeList = req.body.removeImages;
+    if (typeof removeList === "string") {
+      try { removeList = JSON.parse(removeList); } catch { removeList = [removeList]; }
+    }
+    if (Array.isArray(removeList) && removeList.length) {
+      images = images.filter((url) => !removeList.includes(url));
+    }
+    const newFiles = (req.files || []).map((f) => `/uploads/images/${f.filename}`);
+    // Qo'shimcha URL lar
+    let urlImages = [];
+    if (req.body.imageUrls) {
+      let raw = req.body.imageUrls;
+      if (typeof raw === "string") {
+        try { raw = JSON.parse(raw); } catch { raw = raw.split(",").map((s) => s.trim()); }
+      }
+      urlImages = (Array.isArray(raw) ? raw : [raw])
+        .filter((u) => typeof u === "string" && /^https?:\/\//i.test(u.trim()))
+        .map((u) => u.trim());
+    }
+    images = [...images, ...newFiles, ...urlImages].slice(0, 2);
+    if (newFiles.length || urlImages.length || (Array.isArray(removeList) && removeList.length)) {
+      data.images = images;
+    }
   }
 
   if (Object.keys(data).length > 0 && req.user.role !== "ADMIN" && circle.status === "ACTIVE") {
