@@ -14,18 +14,39 @@ import { errorMiddleware, notFoundMiddleware } from "./middleware/error.middlewa
 
 const app = express();
 
-// Swagger UI uchun CSP biroz yumshatiladi
+// Helmet: Cross-Origin-Resource-Policy ni cross-origin qilamiz,
+// aks holda frontend (Vercel) dan backend (Render) rasmlari
+// ERR_BLOCKED_BY_RESPONSE.NotSameOrigin bilan bloklanadi.
 app.use(
   helmet({
     contentSecurityPolicy: env.nodeEnv === "production" ? undefined : false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    crossOriginEmbedderPolicy: false,
   })
 );
+
+// CLIENT_URL bitta yoki vergul bilan bir nechta (masalan Vercel + localhost)
+const allowedOrigins = String(env.clientUrl || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
 app.use(
   cors({
-    origin: env.clientUrl,
+    origin(origin, cb) {
+      // same-origin / curl / server-to-server
+      if (!origin) return cb(null, true);
+      if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+        return cb(null, true);
+      }
+      // developmentda qulaylik
+      if (env.nodeEnv !== "production") return cb(null, true);
+      return cb(new Error(`CORS blocked: ${origin}`));
+    },
     credentials: true,
   })
 );
+
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -42,12 +63,21 @@ const limiter = rateLimit({
 });
 app.use("/api", limiter);
 
-app.use(`/${env.upload.dir}`, express.static(path.join(process.cwd(), env.upload.dir)));
+// Static uploads — boshqa domen (frontend) dan ochilishi uchun headerlar
+app.use(
+  `/${env.upload.dir}`,
+  express.static(path.join(process.cwd(), env.upload.dir), {
+    setHeaders(res) {
+      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Cache-Control", "public, max-age=86400");
+    },
+  })
+);
 
 app.get("/health", (req, res) => res.json({ status: "OK", time: new Date().toISOString() }));
 
 // ========== SWAGGER (OpenAPI) ==========
-// Brauzer: http://localhost:5000/api-docs
 app.use(
   "/api-docs",
   swaggerUi.serve,
@@ -62,7 +92,7 @@ app.use(
     },
   })
 );
-// Raw OpenAPI JSON
+
 app.get("/api-docs.json", (req, res) => {
   res.json(swaggerDocument);
 });
