@@ -255,11 +255,26 @@ model Group {
   circleId      String
   circle        Circle      @relation(fields: [circleId], references: [id], onDelete: Cascade)
   certificates  Certificate[]
+  reviews       Review[]
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
   @@index([circleId])
   @@map("groups")
+}
+
+model Review {
+  id         String   @id @default(uuid())
+  groupId    String
+  group      Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  rating     Int
+  comment    String   @db.Text
+  authorName String
+  createdAt  DateTime @default(now())
+
+  @@index([groupId])
+  @@index([createdAt])
+  @@map("reviews")
 }
 
 model Certificate {

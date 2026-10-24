@@ -8,6 +8,7 @@ import resultRoutes from "./result.routes.js";
 import notificationRoutes from "./notification.routes.js";
 import aiRoutes from "./ai.routes.js";
 import leadRoutes from "./lead.routes.js";
+import reviewRoutes from "./review.routes.js";
 
 const router = Router();
 
@@ -20,5 +21,6 @@ router.use("/results", resultRoutes);
 router.use("/notifications", notificationRoutes);
 router.use("/ai", aiRoutes);
 router.use("/leads", leadRoutes);
+router.use("/reviews", reviewRoutes);
 
 export default router;
