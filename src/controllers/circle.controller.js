@@ -30,7 +30,7 @@ const publicListSelect = {
   viewCount: true,
   createdAt: true,
   courseCenter: { select: { id: true, name: true, images: true } },
-  _count: { select: { groups: true } },
+  _count: { select: { groups: true, reviews: true } },
 };
 
 function haversineKm(lat1, lon1, lat2, lon2) {
@@ -95,6 +95,7 @@ const listCircles = asyncHandler(async (req, res) => {
     price_desc: { priceAmount: "desc" },
     popular: { viewCount: "desc" },
     name: { name: "asc" },
+    rating: { createdAt: "desc" },
   };
   const orderBy = orderByMap[sort] || orderByMap.newest;
 
@@ -133,6 +134,29 @@ const listCircles = asyncHandler(async (req, res) => {
     items = items.slice(skip, skip + take);
   }
 
+  const circleIds = items.map((c) => c.id);
+  const reviewsByCircle = circleIds.length
+    ? await prisma.review.groupBy({
+        by: ["circleId"],
+        where: { circleId: { in: circleIds } },
+        _avg: { rating: true },
+        _count: { rating: true },
+      })
+    : [];
+  const ratingMap = new Map(reviewsByCircle.map((r) => [r.circleId, { avg: Math.round(r._avg.rating * 10) / 10, count: r._count.rating }]));
+
+  items = items.map((c) => ({
+    ...c,
+    avgRating: ratingMap.get(c.id)?.avg ?? 0,
+    reviewCount: ratingMap.get(c.id)?.count ?? 0,
+  }));
+
+  if (sort === "rating") {
+    items.sort((a, b) => b.avgRating - a.avgRating || b.reviewCount - a.reviewCount);
+    effectiveTotal = items.length;
+    items = items.slice(skip, skip + take);
+  }
+
   res.json(
     new ApiResponse(200, {
       items,
@@ -154,6 +178,7 @@ const getCircleById = asyncHandler(async (req, res) => {
       results: { where: { verified: true }, orderBy: { createdAt: "desc" } },
       courseCenter: true,
       owner: { select: { id: true, firstName: true, lastName: true } },
+      reviews: { orderBy: { createdAt: "desc" } },
     },
   });
   if (!circle) throw ApiError.notFound("Togarak topilmadi");
@@ -186,7 +211,16 @@ const getCircleById = asyncHandler(async (req, res) => {
     }
   }
 
-  res.json(new ApiResponse(200, circle));
+  const reviews = circle.reviews || [];
+  const avgRating = reviews.length
+    ? Math.round((reviews.reduce((s, r) => s + r.rating, 0) / reviews.length) * 10) / 10
+    : 0;
+  const ratingDistribution = [5, 4, 3, 2, 1].map((star) => ({
+    star,
+    count: reviews.filter((r) => r.rating === star).length,
+  }));
+
+  res.json(new ApiResponse(200, { ...circle, avgRating, reviewCount: reviews.length, ratingDistribution }));
 });
 
 const trackClick = asyncHandler(async (req, res) => {

@@ -3,10 +3,10 @@ import ApiError from "../utils/ApiError.js";
 
 export async function createReview(req, res, next) {
   try {
-    const { groupId, rating, comment, authorName } = req.body;
+    const { circleId, rating, comment, authorName } = req.body;
 
-    if (!groupId || !rating || !comment || !authorName) {
-      throw ApiError.badRequest("groupId, rating, comment va authorName to'ldirilishi shart");
+    if (!circleId || !rating || !authorName) {
+      throw ApiError.badRequest("circleId, rating va authorName to'ldirilishi shart");
     }
 
     const ratingNum = Number(rating);
@@ -14,16 +14,16 @@ export async function createReview(req, res, next) {
       throw ApiError.badRequest("Rating 1 dan 5 gacha butun son bo'lishi kerak");
     }
 
-    const group = await prisma.group.findUnique({ where: { id: groupId } });
-    if (!group) {
-      throw ApiError.notFound("Guruh topilmadi");
+    const circle = await prisma.circle.findUnique({ where: { id: circleId } });
+    if (!circle) {
+      throw ApiError.notFound("To'garak topilmadi");
     }
 
     const review = await prisma.review.create({
       data: {
-        groupId,
+        circleId,
         rating: ratingNum,
-        comment: String(comment).trim(),
+        comment: comment ? String(comment).trim() : null,
         authorName: String(authorName).trim(),
       },
     });
@@ -34,15 +34,15 @@ export async function createReview(req, res, next) {
   }
 }
 
-export async function getReviewsByGroup(req, res, next) {
+export async function getReviewsByCircle(req, res, next) {
   try {
-    const { groupId } = req.query;
-    if (!groupId) {
-      throw ApiError.badRequest("groupId kerak");
+    const { circleId } = req.query;
+    if (!circleId) {
+      throw ApiError.badRequest("circleId kerak");
     }
 
     const reviews = await prisma.review.findMany({
-      where: { groupId },
+      where: { circleId },
       orderBy: { createdAt: "desc" },
     });
 
@@ -50,7 +50,12 @@ export async function getReviewsByGroup(req, res, next) {
       ? Math.round((reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length) * 10) / 10
       : 0;
 
-    res.json({ success: true, data: reviews, avgRating, total: reviews.length });
+    const distribution = [5, 4, 3, 2, 1].map((star) => ({
+      star,
+      count: reviews.filter((r) => r.rating === star).length,
+    }));
+
+    res.json({ success: true, data: reviews, avgRating, total: reviews.length, distribution });
   } catch (err) {
     next(err);
   }

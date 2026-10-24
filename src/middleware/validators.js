@@ -41,7 +41,7 @@ export const createCourseCenterRules = [
 export const listCirclesQueryRules = [
   query("page").optional().isInt({ min: 1 }),
   query("limit").optional().isInt({ min: 1, max: 50 }),
-  query("sort").optional().isIn(["newest", "oldest", "price_asc", "price_desc", "popular", "name", "nearest"]),
+  query("sort").optional().isIn(["newest", "oldest", "price_asc", "price_desc", "popular", "name", "nearest", "rating"]),
   query("lat").optional().isFloat(),
   query("lng").optional().isFloat(),
   query("radiusKm").optional().isFloat({ min: 0.1, max: 500 }),
