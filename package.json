@@ -1,7 +1,7 @@
 {
-  "name": "togarak-backend",
+  "name": "velox-backend",
   "version": "1.0.0",
-  "description": "Togarak topish platformasi - backend API",
+  "description": "Velox - to'garak va o'quv markazlarini topish platformasi backend API",
   "main": "src/server.js",
   "type": "module",
   "scripts": {

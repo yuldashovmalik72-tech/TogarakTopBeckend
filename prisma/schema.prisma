@@ -158,6 +158,7 @@ model CourseCenter {
   contactTelegram String?
   images          String[]
   tourVideoUrl    String?
+  isVerified      Boolean   @default(false)
   deletedAt       DateTime?
   ownerId         String
   owner           User      @relation("UserCourseCenters", fields: [ownerId], references: [id], onDelete: Cascade)
@@ -191,10 +192,16 @@ model Circle {
   ageGroupMax     Int?
   contactPhone    String?
   contactTelegram String?
+  materialsIncluded Boolean?
+  refundable        Boolean?
+  extraCostsNote    String?   @db.Text
   status          CircleStatus @default(PENDING)
   viewCount       Int          @default(0)
   clickCount      Int          @default(0)
   deletedAt       DateTime?
+  isVerified      Boolean      @default(false)
+  successRate     Int?
+  durationMonths  Int?
   ownerId         String
   owner           User         @relation("UserCircles", fields: [ownerId], references: [id], onDelete: Cascade)
   courseCenterId  String?
@@ -202,6 +209,7 @@ model Circle {
   groups          Group[]
   results         Result[]
   views           CircleView[]
+  bookingLeads    BookingLead[]
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
@@ -303,4 +311,23 @@ model Payment {
   @@index([userId])
   @@index([status])
   @@map("payments")
+}
+
+model BookingLead {
+  id          String   @id @default(uuid())
+  circleId    String
+  circle      Circle   @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  groupId     String?
+  parentName  String
+  phone       String
+  childAge    Int?
+  userGoal    String?
+  status      String   @default("NEW")
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([circleId])
+  @@index([status])
+  @@map("booking_leads")
 }

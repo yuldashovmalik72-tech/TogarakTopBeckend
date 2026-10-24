@@ -3,6 +3,7 @@ import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import { notifyVerified } from "../services/notification.service.js";
+import { uploadToCloud } from "../services/cloudUpload.service.js";
 
 // POST /api/groups/:groupId/certificates - o'qituvchi sertifikatini yuklash
 // Yangi yuklangan sertifikat har doim verified=false bilan boshlanadi -
@@ -22,7 +23,7 @@ const uploadCertificate = asyncHandler(async (req, res) => {
     data: {
       groupId: group.id,
       title,
-      imageUrl: `/uploads/certificates/${req.file.filename}`,
+      imageUrl: (await uploadToCloud(req.file.path, req.file.filename)).url,
       verified: false,
     },
   });

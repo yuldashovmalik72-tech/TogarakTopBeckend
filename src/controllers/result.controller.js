@@ -3,6 +3,7 @@ import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import { notifyVerified } from "../services/notification.service.js";
+import { uploadToCloud } from "../services/cloudUpload.service.js";
 
 // POST /api/circles/:circleId/results
 // Yangi natija har doim verified=false bilan boshlanadi.
@@ -21,7 +22,7 @@ const addResult = asyncHandler(async (req, res) => {
       title,
       type,
       studentName,
-      imageUrl: `/uploads/results/${req.file.filename}`,
+      imageUrl: (await uploadToCloud(req.file.path, req.file.filename)).url,
       verified: false,
     },
   });

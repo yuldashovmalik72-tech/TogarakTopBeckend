@@ -43,7 +43,7 @@ const env = {
     port: Number(process.env.SMTP_PORT || 587),
     user: process.env.SMTP_USER || "",
     pass: process.env.SMTP_PASS || "",
-    from: process.env.SMTP_FROM || "noreply@togarak.uz",
+    from: process.env.SMTP_FROM || "noreply@velox.uz",
   },
   s3: {
     bucket: process.env.S3_BUCKET || "",

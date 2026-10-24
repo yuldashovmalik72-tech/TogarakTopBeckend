@@ -4,6 +4,13 @@ import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import { notifyCircleModeration } from "../services/notification.service.js";
+import { uploadToCloud } from "../services/cloudUpload.service.js";
+
+// FormData bo'sh satr yuboradi — "" degani maydon tozalanadi (null)
+function optionalBool(v) {
+  if (v === undefined || v === null || v === "") return null;
+  return v === true || v === "true" || v === "True";
+}
 
 const publicListSelect = {
   id: true,
@@ -224,8 +231,10 @@ const createCircle = asyncHandler(async (req, res) => {
     throw ApiError.badRequest("UY yoki ONLINE turida courseCenterId yuborilmasligi kerak");
   }
 
-  // Fayl yuklash (local) yoki to'liq rasm URL (Cloudinary, ImgBB va h.k.)
-  const fileImages = (req.files || []).map((f) => `/uploads/images/${f.filename}`);
+  // Fayl yuklash (ImgBB kaliti bo'lsa bulutga, bo'lmasa lokal diskka) yoki to'liq rasm URL
+  const fileImages = await Promise.all(
+    (req.files || []).map(async (f) => (await uploadToCloud(f.path, f.filename)).url)
+  );
   let urlImages = [];
   if (req.body.imageUrls) {
     let raw = req.body.imageUrls;
@@ -251,6 +260,9 @@ const createCircle = asyncHandler(async (req, res) => {
       ageGroupMin: ageGroupMin ? Number(ageGroupMin) : null,
       ageGroupMax: ageGroupMax ? Number(ageGroupMax) : null,
       contactPhone, contactTelegram,
+      materialsIncluded: optionalBool(req.body.materialsIncluded),
+      refundable: optionalBool(req.body.refundable),
+      extraCostsNote: req.body.extraCostsNote || null,
       status: "PENDING",
       ownerId: req.user.id,
       courseCenterId: type === "KURS" ? courseCenterId : null,
@@ -272,12 +284,15 @@ const updateCircle = asyncHandler(async (req, res) => {
   const allowedFields = [
     "name", "category", "direction", "description", "tavsif", "priceType", "priceAmount",
     "currency", "pricePeriod", "address", "latitude", "longitude", "ageGroupMin", "ageGroupMax",
-    "contactPhone", "contactTelegram",
+    "contactPhone", "contactTelegram", "extraCostsNote",
   ];
   const data = {};
   for (const field of allowedFields) {
     if (req.body[field] !== undefined) data[field] = req.body[field];
   }
+  if (data.extraCostsNote !== undefined) data.extraCostsNote = data.extraCostsNote || null;
+  if (req.body.materialsIncluded !== undefined) data.materialsIncluded = optionalBool(req.body.materialsIncluded);
+  if (req.body.refundable !== undefined) data.refundable = optionalBool(req.body.refundable);
   if (data.priceAmount !== undefined) data.priceAmount = data.priceAmount ? Number(data.priceAmount) : null;
   if (data.latitude !== undefined) data.latitude = data.latitude ? Number(data.latitude) : null;
   if (data.longitude !== undefined) data.longitude = data.longitude ? Number(data.longitude) : null;
@@ -303,7 +318,9 @@ const updateCircle = asyncHandler(async (req, res) => {
     if (Array.isArray(removeList) && removeList.length) {
       images = images.filter((url) => !removeList.includes(url));
     }
-    const newFiles = (req.files || []).map((f) => `/uploads/images/${f.filename}`);
+    const newFiles = await Promise.all(
+      (req.files || []).map(async (f) => (await uploadToCloud(f.path, f.filename)).url)
+    );
     // Qo'shimcha URL lar
     let urlImages = [];
     if (req.body.imageUrls) {

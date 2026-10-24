@@ -4,13 +4,13 @@
 const swaggerDocument = {
   openapi: "3.0.3",
   info: {
-    title: "Togarak API",
+    title: "Velox API",
     version: "1.1.0",
     description:
-      "Togarak va o'quv markazlarini topish platformasi backend API.\n\n" +
+      "Velox - to'garak va o'quv markazlarini topish platformasi backend API.\n\n" +
       "**Autentifikatsiya:** `Authorize` tugmasini bosib `Bearer <accessToken>` kiriting.\n" +
       "Login/register dan keyin `accessToken` olinadi.",
-    contact: { name: "Togarak" },
+    contact: { name: "Velox" },
   },
   servers: [
     { url: "http://localhost:5000", description: "Local development" },
@@ -18,7 +18,7 @@ const swaggerDocument = {
   tags: [
     { name: "Health", description: "Server holati" },
     { name: "Auth", description: "Ro'yxatdan o'tish, kirish, profil" },
-    { name: "Circles", description: "Togaraklar / yo'nalishlar" },
+    { name: "Circles", description: "To'garaklar / yo'nalishlar" },
     { name: "Groups", description: "Guruhlar" },
     { name: "Certificates", description: "O'qituvchi sertifikatlari" },
     { name: "Results", description: "O'quvchi natijalari" },

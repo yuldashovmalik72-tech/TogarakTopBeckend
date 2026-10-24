@@ -2,6 +2,7 @@ import prisma from "../config/db.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
+import { uploadToCloud } from "../services/cloudUpload.service.js";
 
 const getById = asyncHandler(async (req, res) => {
   const center = await prisma.courseCenter.findFirst({
@@ -12,6 +13,7 @@ const getById = asyncHandler(async (req, res) => {
         select: {
           id: true, name: true, direction: true, images: true,
           priceType: true, priceAmount: true, currency: true, pricePeriod: true, viewCount: true,
+          groups: { select: { teacherName: true, maxStudents: true, takenStudents: true, status: true } },
         },
       },
     },
@@ -23,7 +25,9 @@ const getById = asyncHandler(async (req, res) => {
 const create = asyncHandler(async (req, res) => {
   const { name, description, address, latitude, longitude, contactPhone, contactTelegram } = req.body;
   if (!name) throw ApiError.badRequest("O'quv markazi nomi kiritilishi shart");
-  const images = (req.files || []).map((f) => `/uploads/images/${f.filename}`);
+  const images = await Promise.all(
+    (req.files || []).map(async (f) => (await uploadToCloud(f.path, f.filename)).url)
+  );
   if (images.length > 2) throw ApiError.badRequest("Maksimum 2 ta rasm yuklash mumkin");
   const center = await prisma.courseCenter.create({
     data: {
@@ -56,7 +60,9 @@ const update = asyncHandler(async (req, res) => {
   if (Array.isArray(removeList) && removeList.length) {
     images = images.filter((url) => !removeList.includes(url));
   }
-  const newFiles = (req.files || []).map((f) => `/uploads/images/${f.filename}`);
+  const newFiles = await Promise.all(
+    (req.files || []).map(async (f) => (await uploadToCloud(f.path, f.filename)).url)
+  );
   images = [...images, ...newFiles];
   if (images.length > 2) throw ApiError.badRequest("Maksimum 2 ta rasm bo'lishi mumkin");
   if (newFiles.length || (Array.isArray(removeList) && removeList.length)) data.images = images;
