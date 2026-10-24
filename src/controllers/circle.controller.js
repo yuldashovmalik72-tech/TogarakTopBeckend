@@ -5,6 +5,7 @@ import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import { notifyCircleModeration } from "../services/notification.service.js";
 import { uploadToCloud } from "../services/cloudUpload.service.js";
+import { geocodeAddress } from "../services/geocode.service.js";
 
 // FormData bo'sh satr yuboradi — "" degani maydon tozalanadi (null)
 function optionalBool(v) {
@@ -282,6 +283,13 @@ const createCircle = asyncHandler(async (req, res) => {
   const images = [...fileImages, ...urlImages].slice(0, 2);
   if (images.length > 2) throw ApiError.badRequest("Maksimum 2 ta rasm bo'lishi mumkin");
 
+  // Koordinata yuborilmagan bo'lsa — manzildan avtomatik geokodlash (xaritada ko'rinishi uchun)
+  let geo = null;
+  const hasCoords = latitude !== undefined && latitude !== null && latitude !== "" && longitude !== undefined && longitude !== null && longitude !== "";
+  if (address && !hasCoords) {
+    geo = await geocodeAddress(address);
+  }
+
   const circle = await prisma.circle.create({
     data: {
       name, category, direction, type, description, tavsif, images, priceType,
@@ -289,8 +297,8 @@ const createCircle = asyncHandler(async (req, res) => {
       currency: currency || null,
       pricePeriod: pricePeriod || null,
       address,
-      latitude: latitude ? Number(latitude) : null,
-      longitude: longitude ? Number(longitude) : null,
+      latitude: hasCoords ? Number(latitude) : geo?.latitude ?? null,
+      longitude: hasCoords ? Number(longitude) : geo?.longitude ?? null,
       ageGroupMin: ageGroupMin ? Number(ageGroupMin) : null,
       ageGroupMax: ageGroupMax ? Number(ageGroupMax) : null,
       contactPhone, contactTelegram,
@@ -332,6 +340,15 @@ const updateCircle = asyncHandler(async (req, res) => {
   if (data.longitude !== undefined) data.longitude = data.longitude ? Number(data.longitude) : null;
   if (data.ageGroupMin !== undefined) data.ageGroupMin = data.ageGroupMin ? Number(data.ageGroupMin) : null;
   if (data.ageGroupMax !== undefined) data.ageGroupMax = data.ageGroupMax ? Number(data.ageGroupMax) : null;
+
+  // Manzil o'zgargan/yozilgan, lekin koordinata yuborilmagan — avtomatik geokodlash
+  if (data.address && data.latitude === undefined && data.longitude === undefined) {
+    const geo = await geocodeAddress(data.address);
+    if (geo) {
+      data.latitude = geo.latitude;
+      data.longitude = geo.longitude;
+    }
+  }
 
   // To'liq images massivi yuborilsa — almashtiriladi (URL lar uchun)
   if (req.body.images !== undefined) {
